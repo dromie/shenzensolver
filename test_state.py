@@ -2,7 +2,7 @@
 import pytest
 from copy import deepcopy
 
-from main import Card, State, Places, Move, solve
+from main import Card, State, Places, Move, solve, BLOCK_CARD_HOLD, BLOCK_CARD
 
 def test_OBLOCK():
     card = Card.construct("O")
@@ -64,7 +64,6 @@ def test_circle2():
     print(state1)
     print(move)
     state11 = state1.move(move)
-#    print(state11)
     assert state11 not in test_set
     test_set.add(state11)
     move = state11.get_valid_moves()[0]
@@ -75,4 +74,40 @@ def test_circle2():
     assert str(state12) == str(state1)
     assert state12.__hash__() == state1.__hash__()
     assert state12 in test_set
+
+
+def test_straight_move():
+    state1 = State()
+    state1.hold = [Card.construct("G"), Card.construct("G"), Card.construct("G")]
+    state1.load_table(["r1 g4 b3 g2","b5"])
+    expected = State()
+    expected.hold = state1.hold
+    expected.load_table(["r1", "b5 g4 b3 g2"])
+    print(state1)
+    moves = state1.get_valid_moves()
+    print(moves[0])
+    state11 = state1.move(moves[0])
+    print(state11)
+    assert state11 == expected
+
+def test_why():
+#b-10 b9 g-10
+#b8 g9 r9
+#1:
+#2:
+#3: r-5
+#4: r-5 r-5
+#5:
+#6: r-5
+#7:
+#8:
+    state1 = State()
+    state1.hold = [Card(2,BLOCK_CARD_HOLD), Card.construct("b9"), Card(1,BLOCK_CARD_HOLD)]
+    state1.solved = [Card.construct("b8"), Card.construct("g9"), Card.construct("r9")]
+    state1.load_table(["", "", "R", "R R", "", "R", "", ""])
+    print(state1)
+    moves = state1.get_valid_moves()
+    print(moves)
+    assert any([move.from_ == Places.H2 for move in moves])
+
 
