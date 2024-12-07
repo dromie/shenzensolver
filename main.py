@@ -167,7 +167,14 @@ class State:
         return all(map(lambda x: x is not None and x.number == 9, self.solved))
 
     def heuristic(self) -> int:
-        return sum(map(lambda x: 0 if x is None else x.number, self.solved)) * 6 - sum(map(lambda x: 0 if x is None else 1, self.hold)) + sum(map(lambda x: 1 if len(x) == 0 else 0, self.table)) + sum(map(lambda x: 1 if x is not None and x.number == BLOCK_CARD_HOLD else 0, self.hold))
+        h = 0
+        h += sum(map(lambda x: 0 if x is None else x.number, self.solved)) * 6 
+        h -= sum(map(lambda x: 0 if x is None else 1, self.hold)) 
+        h += sum(map(lambda x: 1 if len(x) == 0 else 0, self.table)) 
+        h += sum(map(lambda x: 1 if x is not None and x.number == BLOCK_CARD_HOLD else 0, self.hold))
+        h += sum(map(lambda x: 1 if len(x) > 0 and x[0].number == 9 else 0, self.table))
+        h += sum(map(lambda x: 1 if len(x) > 0 and x[-1].number == BLOCK_CARD else 0, self.table))
+        return h
 
     
     def get_valid_moves(self) -> List[Tuple[Places, Places]]:
