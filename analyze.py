@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 import json
-from main import State, Card, solve
+from solver import State, Card, solve
 
 def analyze(screen):
     mask = {}
@@ -69,5 +69,5 @@ def analyze(screen):
 if __name__ == "__main__":
     screen = cv2.imread("test/test2.png",1)
     state = analyze(screen)
-    #print("\n".join(map(str,solve(state))))
+    print("\n".join(map(str,solve(state))))
 
