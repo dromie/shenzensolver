@@ -110,12 +110,17 @@ class Places(Enum):
         return self.value - Places.RBLOCK.value;
 
 @dataclass
-class Move:
-    from_: Places
-    depth: int
-    to: Places
+class CardCoordinates:
+    place: Places
+    position: int = 0
 
-    def __init__(self, from_: Places, to: Places, depth = 0):
+@dataclass
+class Move:
+    from_: CardCoordinates
+    to: CardCoordinates
+    depth: int
+
+    def __init__(self, from_: CardCoordinates, to: CardCoordinates, depth = 0):
         self.from_ = from_
         self.to = to
         self.depth = depth
@@ -126,21 +131,18 @@ class Move:
     def __repr__(self):
         return self.__str__()
 
-
 @dataclass
 class State:
     hold: List[Card]
     solved: List[Card]
     table: List[List[Card]]
-    prev_state: "State"
-    prev_move: Move
+    prev_state: Tuple["State", Move, int]
 
     def __init__(self):
         self.hold = [None, None, None]
         self.solved = [None, None, None]
         self.table = []
-        self.prev_state = None
-        self.prev_move = None
+        self.prev_state = (None, None, 0)
 
     def load_table(self, table:List[str]):
         self.table = []
@@ -180,28 +182,29 @@ class State:
     def get_valid_moves(self) -> List[Tuple[Places, Places]]:
         moves = queue.PriorityQueue()
         for i in range(len(self.table)):
+            column_height = len(self.table[i])
             for j in range(len(self.hold)):
                 if self.hold[j] is None:
                     if len(self.table[i]) > 0:
-                        moves.put(PrioritizedItem(50, Move(Places.table_place(i), Places.hold_place(j))))
+                        moves.put(PrioritizedItem(50, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.hold_place(j)) )))
                 else:
                     if len(self.table[i]) == 0 or self.hold[j].can_be_put_over(self.table[i][-1]):
-                        moves.put(PrioritizedItem(40, Move(Places.hold_place(j), Places.table_place(i))))
+                        moves.put(PrioritizedItem(40, Move(CardCoordinates(Places.hold_place(j)), CardCoordinates(Places.table_place(i), column_height))))
             if len(self.table[i]) == 0:
                 continue
             if self.table[i][-1].number == BLOCK_CARD and self.table[i][-1].color == COLORDICT["o"]:
-                moves.put(PrioritizedItem(-9,Move(Places.table_place(i), Places.OBLOCK)))
+                moves.put(PrioritizedItem(-9, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.OBLOCK))))
                 continue
             for j in range(len(self.solved)):
                     if self.table[i][-1].is_solution(self.solved[j]):
-                        moves.put(PrioritizedItem(0, Move(Places.table_place(i), Places.solved_place(j))))
+                        moves.put(PrioritizedItem(0, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
             for j in range(len(self.table)):
                 if len(self.table[j])==0 or self.table[i][-1].can_be_put_over(self.table[j][-1]):
-                    moves.put(PrioritizedItem(10, Move(Places.table_place(i), Places.table_place(j))))
+                    moves.put(PrioritizedItem(10, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.table_place(j), len(self.table[j])))))
                 k = -1
                 while k > -len(self.table[i]) and self.table[i][k].can_be_put_over(self.table[i][k-1]):
                     if len(self.table[j])>0 and self.table[i][k-1].can_be_put_over(self.table[j][-1]):
-                        moves.put(PrioritizedItem(11+k, Move(Places.table_place(i), Places.table_place(j), -k)))
+                        moves.put(PrioritizedItem(11+k, Move(CardCoordinates(Places.table_place(i), column_height-k), CardCoordinates(Places.table_place(j), len(self.table[j])), -k)))
                     k -= 1
         for color in range(3):
             free_hold = sum(map(lambda x: x is None, self.hold)) > 0
@@ -217,13 +220,13 @@ class State:
                         free_hold = True
                         count += 1
             if count == 4 and free_hold:
-                moves.put(PrioritizedItem(1, Move(Places.block_place(color), Places.block_place(color))))
+                moves.put(PrioritizedItem(1, Move(CardCoordinates(Places.block_place(color)), CardCoordinates(Places.block_place(color)))))
         for i in range(len(self.hold)):
             if self.hold[i] is None:
                 continue
             for j in range(len(self.solved)):
                 if self.hold[i].is_solution(self.solved[j]):
-                    moves.put(PrioritizedItem(5, Move(Places.hold_place(i), Places.solved_place(j))))
+                    moves.put(PrioritizedItem(5, Move(CardCoordinates(Places.hold_place(i)), CardCoordinates(Places.solved_place(j)))))
                 
         return [x.item for x in moves.queue]
 
@@ -232,10 +235,9 @@ class State:
         new_state.hold = deepcopy(self.hold)
         new_state.solved = deepcopy(self.solved)
         new_state.table = deepcopy(self.table)
-        new_state.prev_state = self
-        new_state.prev_move = move
-        if move.from_ in [Places.RBLOCK, Places.GBLOCK, Places.BBLOCK]:
-            card = Card(move.from_.color(), BLOCK_CARD)
+        new_state.prev_state = (self, move, self.prev_state[2]+1)
+        if move.from_.place in [Places.RBLOCK, Places.GBLOCK, Places.BBLOCK]:
+            card = Card(move.from_.place.color(), BLOCK_CARD)
             hold_index = None
             for i in range(len(new_state.hold)):
                 if new_state.hold[i] == card:
@@ -248,37 +250,37 @@ class State:
                 new_state.hold[hold_index] = card
                 new_state.hold[hold_index].number = BLOCK_CARD_HOLD
             return new_state
-        if move.to==Places.OBLOCK:
-            new_state.table[move.from_.value-6].pop()
+        if move.to.place==Places.OBLOCK:
+            new_state.table[move.from_.place.value-6].pop()
             return new_state
-        elif move.from_ in [Places.H1, Places.H2, Places.H3]:
-            card = new_state.hold[move.from_.value]
-            new_state.hold[move.from_.value] = None
-        elif move.from_ in [Places.S1, Places.S2, Places.S3]:
-            card = new_state.solved[move.from_.value-3]
-            new_state.solved[move.from_.value-3] = None
+        elif move.from_.place in [Places.H1, Places.H2, Places.H3]:
+            card = new_state.hold[move.from_.place.value]
+            new_state.hold[move.from_.place.value] = None
+        elif move.from_.place in [Places.S1, Places.S2, Places.S3]:
+            card = new_state.solved[move.from_.place.value-3]
+            new_state.solved[move.from_.place.value-3] = None
         else:
             if move.depth == 0:
-                card = new_state.table[move.from_.value-6].pop()
+                card = new_state.table[move.from_.place.value-6].pop()
             else:
-                cards = new_state.table[move.from_.value-6][-move.depth-1:]
-                new_state.table[move.from_.value-6] = new_state.table[move.from_.value-6][:-move.depth-1]
-        if move.to in [Places.H1, Places.H2, Places.H3]:
-            new_state.hold[move.to.value] = card
-        elif move.to in [Places.S1, Places.S2, Places.S3]:
-            new_state.solved[move.to.value-3] = card
+                cards = new_state.table[move.from_.place.value-6][-move.depth-1:]
+                new_state.table[move.from_.place.value-6] = new_state.table[move.from_.place.value-6][:-move.depth-1]
+        if move.to.place in [Places.H1, Places.H2, Places.H3]:
+            new_state.hold[move.to.place.value] = card
+        elif move.to.place in [Places.S1, Places.S2, Places.S3]:
+            new_state.solved[move.to.place.value-3] = card
         else:
             if move.depth == 0:
-                new_state.table[move.to.value-6].append(card)
+                new_state.table[move.to.place.value-6].append(card)
             else:
-                new_state.table[move.to.value-6].extend(cards)
+                new_state.table[move.to.place.value-6].extend(cards)
         return new_state
 
 def get_moves(state: State) -> List[Move]:
     moves = []
-    while state.prev_move is not None:
-        moves.append(state.prev_move)
-        state = state.prev_state
+    while state.prev_state[1] is not None:
+        moves.append(state.prev_state[1])
+        state = state.prev_state[0]
     moves.reverse()
     return moves
 

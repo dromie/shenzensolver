@@ -2,16 +2,17 @@
 import pytest
 from copy import deepcopy
 
-from main import Card, State, Places, Move, solve, BLOCK_CARD_HOLD, BLOCK_CARD
+from solver import Card, State, Places, Move, solve, BLOCK_CARD_HOLD, BLOCK_CARD, CardCoordinates
 
 def test_OBLOCK():
     card = Card.construct("O")
     test_state = State()
     test_state.table = [[card]]
     moves = test_state.get_valid_moves()
-    assert len(moves) == 1
-    assert moves[0].to == Places.OBLOCK
-    assert moves[0].from_ == Places.T1
+    print(moves)
+    assert len(moves) == 4
+    assert moves[0].to.place == Places.OBLOCK
+    assert moves[0].from_.place == Places.T1
 
 def test_RBLOCK():
     card = Card.construct("R")
@@ -19,7 +20,7 @@ def test_RBLOCK():
     test_state.table = [[card], [card], [card], [card]]
     moves = test_state.get_valid_moves()
     print(moves)
-    assert Move(Places.RBLOCK,Places.RBLOCK) in moves
+    assert Move(CardCoordinates(Places.RBLOCK), CardCoordinates(Places.RBLOCK)) in moves
 
 def test_solve_trivial():
     init_state = State()
@@ -108,6 +109,6 @@ def test_why():
     print(state1)
     moves = state1.get_valid_moves()
     print(moves)
-    assert any([move.from_ == Places.H2 for move in moves])
+    assert any([move.from_.place == Places.H2 for move in moves])
 
 
