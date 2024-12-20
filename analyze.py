@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+from typing import List, Tuple, Set, Any
+
 import cv2
+import sys
 import numpy as np
 import json
 from solver import State, Card, solve
 
-def analyze(screen):
+def analyze(screen) -> Tuple[State, Tuple[List[int], List[int], int | None]]:
     mask = {}
     c='o'
     mask[f"{c.upper()}"] = cv2.imread(f"masks/{c}BLOCK.png",1)
@@ -37,10 +40,14 @@ def analyze(screen):
                 if a[0]==x and a[1]==y:
                     return k
         return None
-    holdrow = None
-    if len(rows)>5:
-        holdrow = rows[0]
-        rows = rows[1:]
+    holdrows = []
+    while len(rows)>5:
+        if len(holdrows)==0 or abs(holdrows[-1] - rows[0]) <= 5:
+            holdrows.append(rows[0])
+            rows = rows[1:]
+        else:
+            print(f"holdrow: {holdrows}, rows: {rows}")
+            break
 
     table = [[None for _ in range(len(rows))] for _ in range(len(columns))]
     for i,x in enumerate(rows):
@@ -52,22 +59,24 @@ def analyze(screen):
         if not all([x is None for x in table[i]]):
             table_str.append((" ".join([x if x is not None else " " for x in table[i]])).strip())
     state = State()
-    i = 0
-    if holdrow is not None:
+    for holdrow in holdrows:
         for j,y in enumerate(columns):
             c = find_card(y, holdrow)
             if c is not None and c != 'O':
-                state.solved[i] = Card.construct(c)
-                i+=1
-                
-                
+                print(f"Hold: {c}, {j}, {y}, {holdrows}")
+                if j in [0,1,2]:
+                    state.hold[j] = Card.construct(c)
+                elif j in [5,6,7]:
+                    state.solved[j-5] = Card.construct(c)
     state.load_table(table_str)
-    print(state)
-    return state
+    return (state, (rows, columns, holdrows))
 
 
 if __name__ == "__main__":
-    screen = cv2.imread("test/test2.png",1)
-    state = analyze(screen)
-    print("\n".join(map(str,solve(state))))
+    file = "test/test2.png"
+    if sys.argv[1:]:
+        file = sys.argv[1]
+    screen = cv2.imread(file,1)
+    analisis = analyze(screen)
+    print(analisis[0])
 

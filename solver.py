@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import os
 import time
 import queue
-from typing import List, Tuple, Set, Any
+from typing import List, Tuple, Set, Any, Callable
 from enum import Enum
 from copy import deepcopy
 
@@ -150,20 +150,24 @@ class State:
             self.table.append(list(filter(lambda x: x is not None, map(lambda x: Card.construct(x), line.strip().split(" ")))))
 
     def __hash__(self):
-        return hash(str(self))
+        return hash(self.__repr__())
 
     def __eq__(self, other: "State"):
         return str(self) == str(other)
 
     def __str__(self):
-        hold = " ".join(sorted(map(lambda x: str(x), self.hold)))
-        solved = " ".join(sorted(map(lambda x: str(x), self.solved)))
-        #table = "\n".join(reversed(list(map(lambda x: " ".join(map(lambda y: str(y), x)), self.table))))
+        #hold = " ".join(sorted(map(lambda x: str(x), self.hold)))
+        #solved = " ".join(sorted(map(lambda x: str(x), self.solved)))
+        hold = " ".join(map(lambda x: str(x), self.hold))
+        solved = " ".join(map(lambda x: str(x), self.solved))
         table = "\n".join([" ".join([str(i+1)+":"] + list(map(lambda x: str(x), self.table[i]))) for i in range(len(self.table))])
         return f"{hold}\n{solved}\n{table}"
     
     def __repr__(self) -> str:
-        return self.__str__()
+        hold = " ".join(map(lambda x: str(x), self.hold))
+        solved = " ".join(map(lambda x: str(x), self.solved))
+        table = "\n".join(reversed(list(map(lambda x: " ".join(map(lambda y: str(y), x)), self.table))))
+        return f"{hold}\n{solved}\n{table}"
 
     def is_solved(self) -> bool:
         return all(map(lambda x: x is not None and x.number == 9, self.solved))
@@ -175,7 +179,10 @@ class State:
         h += sum(map(lambda x: 1 if len(x) == 0 else 0, self.table)) 
         h += sum(map(lambda x: 1 if x is not None and x.number == BLOCK_CARD_HOLD else 0, self.hold))
         h += sum(map(lambda x: 1 if len(x) > 0 and x[0].number == 9 else 0, self.table))
-        h += sum(map(lambda x: 1 if len(x) > 0 and x[-1].number == BLOCK_CARD else 0, self.table))
+        for color in ["r", "g", "b"]:
+            b = sum(map(lambda x: 1 if len(x) > 0 and x[-1].number == BLOCK_CARD and x[-1].color==COLORDICT[color] else 0, self.table))
+            if b==4:
+                h+=4
         return h
 
     
@@ -188,6 +195,8 @@ class State:
                     if len(self.table[i]) > 0:
                         moves.put(PrioritizedItem(50, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.hold_place(j)) )))
                 else:
+                    if self.hold[j].number == BLOCK_CARD_HOLD:
+                        continue
                     if len(self.table[i]) == 0 or self.hold[j].can_be_put_over(self.table[i][-1]):
                         moves.put(PrioritizedItem(40, Move(CardCoordinates(Places.hold_place(j)), CardCoordinates(Places.table_place(i), column_height))))
             if len(self.table[i]) == 0:
@@ -197,14 +206,16 @@ class State:
                 continue
             for j in range(len(self.solved)):
                     if self.table[i][-1].is_solution(self.solved[j]):
-                        moves.put(PrioritizedItem(0, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
+                        moves.put(PrioritizedItem(-5, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
+                        if self.table[i][-1].number == 1:
+                            break
             for j in range(len(self.table)):
                 if len(self.table[j])==0 or self.table[i][-1].can_be_put_over(self.table[j][-1]):
                     moves.put(PrioritizedItem(10, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.table_place(j), len(self.table[j])))))
                 k = -1
                 while k > -len(self.table[i]) and self.table[i][k].can_be_put_over(self.table[i][k-1]):
                     if len(self.table[j])>0 and self.table[i][k-1].can_be_put_over(self.table[j][-1]):
-                        moves.put(PrioritizedItem(11+k, Move(CardCoordinates(Places.table_place(i), column_height-k), CardCoordinates(Places.table_place(j), len(self.table[j])), -k)))
+                        moves.put(PrioritizedItem(11+k, Move(CardCoordinates(Places.table_place(i), column_height+k), CardCoordinates(Places.table_place(j), len(self.table[j])), -k)))
                     k -= 1
         for color in range(3):
             free_hold = sum(map(lambda x: x is None, self.hold)) > 0
@@ -220,13 +231,13 @@ class State:
                         free_hold = True
                         count += 1
             if count == 4 and free_hold:
-                moves.put(PrioritizedItem(1, Move(CardCoordinates(Places.block_place(color)), CardCoordinates(Places.block_place(color)))))
+                moves.put(PrioritizedItem(-2, Move(CardCoordinates(Places.block_place(color)), CardCoordinates(Places.block_place(color)))))
         for i in range(len(self.hold)):
             if self.hold[i] is None:
                 continue
             for j in range(len(self.solved)):
                 if self.hold[i].is_solution(self.solved[j]):
-                    moves.put(PrioritizedItem(5, Move(CardCoordinates(Places.hold_place(i)), CardCoordinates(Places.solved_place(j)))))
+                    moves.put(PrioritizedItem(-5, Move(CardCoordinates(Places.hold_place(i)), CardCoordinates(Places.solved_place(j)))))
                 
         return [x.item for x in moves.queue]
 
@@ -242,6 +253,9 @@ class State:
             for i in range(len(new_state.hold)):
                 if new_state.hold[i] == card:
                     new_state.hold[i] = None
+                    if hold_index is None:
+                        hold_index = i
+                if new_state.hold[i] is None:
                     hold_index = i
             for i in range(len(new_state.table)):
                 if len(new_state.table[i])>0 and new_state.table[i][-1] == card:
@@ -284,20 +298,15 @@ def get_moves(state: State) -> List[Move]:
     moves.reverse()
     return moves
 
-
-def solve(init_state: State) -> List[Move]:
+def a_star(P: queue.PriorityQueue, Pset: Set[State], Qset: Set[State], heuristic: Callable[[State], int]) -> List[Move]:
     size = [1, 1]
     score = [0, 0]
-    P = queue.PriorityQueue()
-    P.put(PrioritizedItem(-init_state.heuristic(), init_state))
-    Pset = set([init_state])
-    Qset = set()
     while not P.empty():
         state = P.get().item
         Qset.add(state)
         Pset.remove(state)
-        if state.heuristic() > score[0]:
-            score[0] = state.heuristic()
+        if heuristic(state) > score[0]:
+            score[0] = heuristic(state)
             print("New best score: ", score[0])
             print(state)
             print(get_moves(state))
@@ -305,16 +314,32 @@ def solve(init_state: State) -> List[Move]:
             size[0] = P.qsize() + len(Qset)
             if (size[0] - size[1]) > 10000:
                 size[1] = size[0]
-                print(f"Max_size: {size[0]} = {len(Pset)} + {len(Qset)} {time.strftime("%H:%M:%S")} best score: {state.heuristic()}")
+                print(f"Max_size: {size[0]} = {len(Pset)} + {len(Qset)} {time.strftime("%H:%M:%S")} best score: {heuristic(state)}")
                 print(state)
         for move in state.get_valid_moves():
             new_state = state.move(move)
             if new_state.is_solved():
                 return get_moves(new_state)
             if new_state not in Pset and new_state not in Qset:
-                P.put(PrioritizedItem(-new_state.heuristic(), new_state))
+                P.put(PrioritizedItem(-heuristic(new_state), new_state))
                 Pset.add(new_state)
     return []
+
+def solve(init_state: State) -> List[Move]:
+    P = queue.PriorityQueue()
+    P.put(PrioritizedItem(-init_state.heuristic(), init_state))
+    Pset = set([init_state])
+    Qset = set()
+    moves = a_star(P, Pset, Qset, lambda x: x.heuristic())
+#    P2 = queue.PriorityQueue()
+#    for state in Pset:
+#        if (state.prev_state[2]<len(moves)):
+#            P2.put(PrioritizedItem(-state.prev_state[2], state))
+#    moves2 = a_star(P2, Pset, Qset, lambda x: x.prev_state[2])
+#    print("Found 1st solution, moving to find faster one.")
+#    if len(moves2) < len(moves):
+#        return moves2
+    return moves
 
 def main():
     init_state = State()
