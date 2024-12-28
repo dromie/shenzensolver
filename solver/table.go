@@ -81,7 +81,7 @@ func (t *Table) heuristic() int {
 	return h
 }
 
-func (t *Table) PopCard(place Places) Card {
+func (t *Table) PopCard(place Place) Card {
 	if place >= H1 && place <= H3 {
 		card := t.Hold[place-H1]
 		t.Hold[place-H1] = Card{}
@@ -95,7 +95,7 @@ func (t *Table) PopCard(place Places) Card {
 	panic(fmt.Sprintf("GetCard: invalid place %v", place))
 }
 
-func (t *Table) PushCard(place Places, card Card) {
+func (t *Table) PushCard(place Place, card Card) {
 	if place >= H1 && place <= H3 {
 		t.Hold[place-H1] = card
 		return

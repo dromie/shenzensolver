@@ -8,10 +8,10 @@ import (
 	"github.com/mohae/deepcopy"
 )
 
-type Places int
+type Place int
 
 const (
-	H1 Places = iota
+	H1 Place = iota
 	H2
 	H3
 	S1
@@ -31,58 +31,52 @@ const (
 	OBLOCK
 )
 
-func table_place(i int) Places {
+func table_place(i int) Place {
 	if 0 <= i && i < 8 {
-		return Places(int(T1) + i)
+		return Place(int(T1) + i)
 	}
 	panic("Invalid table place " + fmt.Sprintf("%d", i))
 }
 
-func hold_place(i int) Places {
+func hold_place(i int) Place {
 	if 0 <= i && i < 3 {
-		return Places(int(H1) + i)
+		return Place(int(H1) + i)
 	}
 	panic("Invalid hold place " + fmt.Sprintf("%d", i))
 }
 
-func solved_place(i int) Places {
+func solved_place(i int) Place {
 	if 0 <= i && i < 3 {
-		return Places(int(S1) + i)
+		return Place(int(S1) + i)
 	}
 	panic("Invalid solved place " + fmt.Sprintf("%d", i))
 }
 
-func block_place(color CardSuit) Places {
-	return Places(int(RBLOCK) - 1 + int(color))
+func block_place(color CardSuit) Place {
+	return Place(int(RBLOCK) - 1 + int(color))
 }
 
-func (p Places) block_color() CardSuit {
+func (p Place) block_color() CardSuit {
 	return CardSuit(int(p) - int(RBLOCK) + 1)
 }
 
-type CardCoordinate struct {
-	place Places
-	index int
-}
-
 type Move struct {
-	from  CardCoordinate
-	to    CardCoordinate
+	from  Place
+	to    Place
 	depth int
 }
 
 func get_valid_moves(table *Table) []Move {
 	pq := util.Pqueue_init[Move]()
 	for i, column := range table.Table {
-		column_height := len(column)
 		for j, hold := range table.Hold {
 			if hold == (Card{}) {
 				if len(column) > 0 && column[len(column)-1] == constructCard("O") {
 					pq.Push(
 						&util.Item[Move]{
 							Value: Move{
-								CardCoordinate{table_place(i), 0},
-								CardCoordinate{hold_place(j), 0},
+								table_place(i),
+								hold_place(j),
 								0,
 							},
 							Priority: -50,
@@ -94,7 +88,7 @@ func get_valid_moves(table *Table) []Move {
 					continue
 				}
 				if len(column) == 0 || hold.can_be_put_over(column[len(column)-1]) {
-					pq.Push(&util.Item[Move]{Value: Move{CardCoordinate{hold_place(j), 0}, CardCoordinate{table_place(i), 0}, 0}, Priority: -40})
+					pq.Push(&util.Item[Move]{Value: Move{hold_place(j), table_place(i), 0}, Priority: -40})
 				}
 			}
 		}
@@ -103,8 +97,8 @@ func get_valid_moves(table *Table) []Move {
 		}
 		if column[len(column)-1] == constructCard("O") {
 			return []Move{{
-				CardCoordinate{table_place(i), column_height},
-				CardCoordinate{OBLOCK, 0},
+				table_place(i),
+				OBLOCK,
 				0}}
 		}
 		for j, solved := range table.Solved {
@@ -112,8 +106,8 @@ func get_valid_moves(table *Table) []Move {
 				pq.Push(
 					&util.Item[Move]{
 						Value: Move{
-							CardCoordinate{table_place(i), column_height},
-							CardCoordinate{solved_place(j), 0},
+							table_place(i),
+							solved_place(j),
 							0,
 						},
 						Priority: 5},
@@ -127,8 +121,8 @@ func get_valid_moves(table *Table) []Move {
 			if len(column2) == 0 || column[len(column)-1].can_be_put_over(column2[len(column2)-1]) {
 				pq.Push(&util.Item[Move]{
 					Value: Move{
-						CardCoordinate{table_place(i), column_height},
-						CardCoordinate{table_place(j), len(column2)},
+						table_place(i),
+						table_place(j),
 						0,
 					},
 					Priority: -10})
@@ -138,11 +132,11 @@ func get_valid_moves(table *Table) []Move {
 				if len(column2) > 0 && column[k-1].can_be_put_over(column2[len(column2)-1]) {
 					pq.Push(&util.Item[Move]{
 						Value: Move{
-							CardCoordinate{table_place(i), k},
-							CardCoordinate{table_place(j), len(column2)},
-							k,
+							table_place(i),
+							table_place(j),
+							len(column) - k,
 						},
-						Priority: -(11 + k)})
+						Priority: -(11 - k)})
 				}
 			}
 		}
@@ -170,8 +164,8 @@ func get_valid_moves(table *Table) []Move {
 		if count == 4 && free_hold {
 			pq.Push(&util.Item[Move]{
 				Value: Move{
-					CardCoordinate{block_place(color), 0},
-					CardCoordinate{block_place(color), 0},
+					block_place(color),
+					block_place(color),
 					0,
 				}, Priority: 2})
 		}
@@ -182,8 +176,8 @@ func get_valid_moves(table *Table) []Move {
 				if hold.is_solution(solved) {
 					pq.Push(&util.Item[Move]{
 						Value: Move{
-							CardCoordinate{hold_place(i), 0},
-							CardCoordinate{solved_place(j), 0},
+							hold_place(i),
+							solved_place(j),
 							0,
 						},
 						Priority: 5})
@@ -202,7 +196,7 @@ func get_valid_moves(table *Table) []Move {
 
 func make_block_move(table *Table, move Move) Table {
 	new_table := deepcopy.Copy(*table).(Table)
-	card := Card{move.from.place.block_color(), BLOCK}
+	card := Card{move.from.block_color(), BLOCK}
 	hold_index := -1
 	for i, hold := range new_table.Hold {
 		if hold == card {
@@ -230,23 +224,23 @@ func make_block_move(table *Table, move Move) Table {
 }
 
 func make_move(table *Table, move Move) Table {
-	if move.from.place == RBLOCK || move.from.place == GBLOCK || move.from.place == BBLOCK {
+	if move.from == RBLOCK || move.from == GBLOCK || move.from == BBLOCK {
 		return make_block_move(table, move)
 	}
-	if move.from.place == OBLOCK {
+	if move.from == OBLOCK {
 		new_table := deepcopy.Copy(*table).(Table)
-		new_table.Table[move.from.place] = new_table.Table[move.from.place][:len(new_table.Table[move.from.place])-1]
+		new_table.Table[move.from] = new_table.Table[move.from][:len(new_table.Table[move.from])-1]
 		return new_table
 	}
 	new_table := deepcopy.Copy(*table).(Table)
 	if move.depth == 0 {
-		card := new_table.PopCard(move.from.place)
-		new_table.PushCard(move.to.place, card)
+		card := new_table.PopCard(move.from)
+		new_table.PushCard(move.to, card)
 	} else {
-		column := new_table.Table[move.from.place]
-		cards := column[len(column)-move.depth:]
-		new_table.Table[move.from.place] = column[:len(column)-move.depth]
-		new_table.Table[move.to.place] = append(new_table.Table[move.to.place], cards...)
+		column := new_table.Table[move.from-T1]
+		cards := column[len(column)-move.depth-1:]
+		new_table.Table[move.from-T1] = column[:len(column)-move.depth-1]
+		new_table.Table[move.to-T1] = append(new_table.Table[move.to-T1], cards...)
 	}
 	return new_table
 }

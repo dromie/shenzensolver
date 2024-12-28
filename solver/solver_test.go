@@ -14,7 +14,7 @@ func Test_RBLOCK(t *testing.T) {
 	test_table.load_table([]string{"R", "R", "R", "R"})
 	moves := get_valid_moves(&test_table)
 	fmt.Println(moves)
-	if RBLOCK != moves[0].from.place || RBLOCK != moves[0].to.place {
+	if RBLOCK != moves[0].from || RBLOCK != moves[0].to {
 		t.Errorf("Invalid move")
 	}
 }
@@ -86,7 +86,7 @@ func Test_OBLOCK(t *testing.T) {
 	if len(moves) != 1 {
 		t.Errorf("Invalid move OBLOCK not found")
 	}
-	if moves[0].from.place != T1 || moves[0].to.place != OBLOCK {
+	if moves[0].from != T1 || moves[0].to != OBLOCK {
 		t.Errorf("Invalid move, not an OBLOCK move")
 
 	}
