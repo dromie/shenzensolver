@@ -2,6 +2,8 @@ package solver
 
 import (
 	"fmt"
+	"runtime"
+	"sync"
 
 	A "github.com/IBM/fp-go/array"
 	"github.com/dromie/shenzensolver/util"
@@ -243,4 +245,60 @@ func make_move(table *Table, move Move) Table {
 		new_table.Table[move.to-T1] = append(new_table.Table[move.to-T1], cards...)
 	}
 	return new_table
+}
+
+type State struct {
+	table     *Table
+	prevState *State
+	move      Move
+	depth     int
+}
+
+func solve_helper(in chan<- interface{}, out <-chan interface{}, solutions chan State, allStates *sync.Map) {
+	for item := range out {
+		state := item.(State)
+		for _, move := range get_valid_moves(state.table) {
+			new_table := make_move(state.table, move)
+			new_state := State{&new_table, &state, move, state.depth + 1}
+			if new_table.is_solved() {
+				solutions <- new_state
+				return
+			}
+			if oo, found := allStates.Load(new_state.table.String()); !found {
+				allStates.Store(new_state.table.String(), new_state)
+				in <- new_state
+			} else {
+				oldState := oo.(State)
+				if oldState.depth > state.depth+1 {
+					allStates.Store(state.table.String(), state)
+				}
+			}
+		}
+	}
+}
+
+func solve(table *Table) []Move {
+	states := sync.Map{}
+	in, out := util.MakeInfinite()
+	solutions := make(chan State)
+	init_state := State{table, nil, Move{}, 0}
+	states.Store(init_state.table.String(), init_state)
+	in <- init_state
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go solve_helper(in, out, solutions, &states)
+	}
+
+	solution := <-solutions
+	moves := []Move{}
+	for solution.prevState != nil {
+		fmt.Println(solution.move)
+		moves = append(moves, solution.move)
+		solution = *solution.prevState
+		if solution2, found := states.Load(solution.table.String()); found {
+			solution = solution2.(State)
+		} else {
+			panic("Failed to find modified state in state map")
+		}
+	}
+	return moves
 }

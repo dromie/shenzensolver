@@ -68,3 +68,16 @@ func Test_Table_DeepCopy(t *testing.T) {
 		t.Errorf("Deep copy failed")
 	}
 }
+
+func Test_Table_as_Key(t *testing.T) {
+	table := [2]Table{{}, {}}
+	table[0].init()
+	table[0].load_table([]string{"r9 r8 r7 r6 r5 r4 r3 r2 r1", "g9 g8 g7 g6 g5 g4 g3 g2 g1", "b9 b8 b7 b6 b5 b4 b3 b2 b1"})
+	table[1].init()
+	table[1].load_table([]string{"r9 r8 r7 r6 r5 r4 r3 r2 r1", "g9 g8 g7 g6 g5 g4 g3 g2 g1", "b9 b8 b7 b6 b5 b4 b3 b2 b1"})
+	test_map := make(map[string]bool)
+	test_map[table[0].String()] = true
+	if !test_map[table[1].String()] {
+		t.Errorf("Table as key failed")
+	}
+}

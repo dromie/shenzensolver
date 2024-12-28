@@ -75,7 +75,7 @@ func (c *Card) is_solution(other Card) bool {
 	if c.Value == BLOCK {
 		return false
 	}
-	return c.Suit == other.Suit && c.Value == other.Value+1
+	return c.Value == 1 && other == Card{} || c.Suit == other.Suit && c.Value == other.Value+1
 }
 
 func (c *Card) can_be_put_over(other Card) bool {

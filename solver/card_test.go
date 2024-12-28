@@ -15,12 +15,19 @@ func Test_OBLOCK_cardConstruct(t *testing.T) {
 }
 
 func Test_solution(t *testing.T) {
-	card := constructCard("r3")
-	if card.is_solution(constructCard("g1")) {
+	r3 := constructCard("r3")
+	if r3.is_solution(constructCard("g1")) {
 		t.Errorf("Card is not a solution")
 	}
-	if !card.is_solution(constructCard("r2")) {
+	if !r3.is_solution(constructCard("r2")) {
 		t.Errorf("Card is a solution")
+	}
+	if r3.is_solution(Card{}) {
+		t.Errorf("r3 is not a solution for empty Card")
+	}
+	r1 := constructCard("r1")
+	if !r1.is_solution(Card{}) {
+		t.Errorf("r1 is a solution for empty Card")
 	}
 }
 

@@ -91,3 +91,37 @@ func Test_OBLOCK(t *testing.T) {
 
 	}
 }
+
+func Test_one_move_to_win(t *testing.T) {
+	test_table := Table{}
+	test_table.init()
+	test_table.Solved = []Card{{RED, EIGHT}, {GREEN, NINE}, {BLACK, NINE}}
+	test_table.load_table([]string{"r9"})
+	moves := solve(&test_table)
+	if len(moves) != 1 {
+		t.Errorf("Invalid solution length %d", len(moves))
+	}
+	fmt.Println(moves)
+}
+
+func Test_more_move_to_win(t *testing.T) {
+	test_table := Table{}
+	test_table.init()
+	test_table.Solved = []Card{{}, {}, {BLACK, NINE}}
+	test_table.load_table([]string{"r9 r8 r7 r6 r5 r4 r3 r2 r1", "g9 g8 g7 g6 g5 g4 g3 g2 g1"})
+	moves := solve(&test_table)
+	if len(moves) != 2 {
+		t.Errorf("Invalid solution length %d", len(moves))
+	}
+	fmt.Println(moves)
+}
+
+func Test_solve_trivial(t *testing.T) {
+	table := Table{}
+	table.init()
+	table.load_table([]string{"r9 r8 r7 r6 r5 r4 r3 r2 r1", "g9 g8 g7 g6 g5 g4 g3 g2 g1", "b9 b8 b7 b6 b5 b4 b3 b2 b1"})
+	moves := solve(&table)
+	if len(moves) != 27 {
+		t.Errorf("Invalid solution length %d", len(moves))
+	}
+}
