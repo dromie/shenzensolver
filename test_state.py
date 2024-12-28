@@ -10,7 +10,7 @@ def test_OBLOCK():
     test_state.table = [[card]]
     moves = test_state.get_valid_moves()
     print(moves)
-    assert len(moves) == 4
+    assert len(moves) == 1
     assert moves[0].to.place == Places.OBLOCK
     assert moves[0].from_.place == Places.T1
 
@@ -33,7 +33,7 @@ def test_solve_trivial_with_blockcards():
     init_state.load_table(["r9 r8 r7 r6 r5 r4 r3 r2 r1 R G B", "g9 g8 g7 g6 g5 g4 g3 g2 g1 R G B", "b9 b8 b7 b6 b5 b4 b3 b2 b1 R G B", "R", "G", "B"])
     moves = solve(init_state)
     print(moves)
-    assert len(moves) < 50
+    assert len(moves) == 30
 
 def test_no_solution():
     init_state = State()

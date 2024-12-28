@@ -80,7 +80,7 @@ def make_a_move(move:Move, screengeometry:Tuple[List[int], List[int], int], scre
         else:
             x=screenx + screengeometry[1][3]+OFFSET
             y=screeny + 160 + (move.to.place.value - Places.RBLOCK.value) * 80
-            pyautogui.moveTo(x, y,duration=0.1)
+            pyautogui.moveTo(x, y, duration=0.1, tween=pyautogui.easeInOutQuad)
             time.sleep(0.1)
             pyautogui.click()
             pyautogui.doubleClick(x, y, duration=0.2)

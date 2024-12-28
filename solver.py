@@ -66,8 +66,14 @@ class Card:
         return self.__str__()
 
 @dataclass(order=True)
-class PrioritizedItem:
+class SinglePrioritizedItem:
     priority: int
+    item: Any=field(compare=False)
+
+@dataclass(order=True)
+class DualPrioritizedItem:
+    priority1: int
+    priority2: int
     item: Any=field(compare=False)
 
 class Places(Enum):
@@ -186,36 +192,36 @@ class State:
         return h
 
     
-    def get_valid_moves(self) -> List[Tuple[Places, Places]]:
+    def get_valid_moves(self) -> List[Move]:
         moves = queue.PriorityQueue()
         for i in range(len(self.table)):
             column_height = len(self.table[i])
             for j in range(len(self.hold)):
                 if self.hold[j] is None:
-                    if len(self.table[i]) > 0:
-                        moves.put(PrioritizedItem(50, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.hold_place(j)) )))
+                    if len(self.table[i]) > 0 and not (self.table[i][-1].number == BLOCK_CARD and self.table[i][-1].color == COLORDICT["o"]):
+                        moves.put(SinglePrioritizedItem(50, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.hold_place(j)) )))
                 else:
                     if self.hold[j].number == BLOCK_CARD_HOLD:
                         continue
                     if len(self.table[i]) == 0 or self.hold[j].can_be_put_over(self.table[i][-1]):
-                        moves.put(PrioritizedItem(40, Move(CardCoordinates(Places.hold_place(j)), CardCoordinates(Places.table_place(i), column_height))))
+                        moves.put(SinglePrioritizedItem(40, Move(CardCoordinates(Places.hold_place(j)), CardCoordinates(Places.table_place(i), column_height))))
             if len(self.table[i]) == 0:
                 continue
             if self.table[i][-1].number == BLOCK_CARD and self.table[i][-1].color == COLORDICT["o"]:
-                moves.put(PrioritizedItem(-9, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.OBLOCK))))
+                moves.put(SinglePrioritizedItem(-9, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.OBLOCK))))
                 continue
             for j in range(len(self.solved)):
                     if self.table[i][-1].is_solution(self.solved[j]):
-                        moves.put(PrioritizedItem(-5, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
+                        moves.put(SinglePrioritizedItem(-5, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
                         if self.table[i][-1].number == 1:
                             break
             for j in range(len(self.table)):
                 if len(self.table[j])==0 or self.table[i][-1].can_be_put_over(self.table[j][-1]):
-                    moves.put(PrioritizedItem(10, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.table_place(j), len(self.table[j])))))
+                    moves.put(SinglePrioritizedItem(10, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.table_place(j), len(self.table[j])))))
                 k = -1
                 while k > -len(self.table[i]) and self.table[i][k].can_be_put_over(self.table[i][k-1]):
                     if len(self.table[j])>0 and self.table[i][k-1].can_be_put_over(self.table[j][-1]):
-                        moves.put(PrioritizedItem(11+k, Move(CardCoordinates(Places.table_place(i), column_height+k), CardCoordinates(Places.table_place(j), len(self.table[j])), -k)))
+                        moves.put(SinglePrioritizedItem(11+k, Move(CardCoordinates(Places.table_place(i), column_height+k), CardCoordinates(Places.table_place(j), len(self.table[j])), -k)))
                     k -= 1
         for color in range(3):
             free_hold = sum(map(lambda x: x is None, self.hold)) > 0
@@ -231,13 +237,13 @@ class State:
                         free_hold = True
                         count += 1
             if count == 4 and free_hold:
-                moves.put(PrioritizedItem(-2, Move(CardCoordinates(Places.block_place(color)), CardCoordinates(Places.block_place(color)))))
+                moves.put(SinglePrioritizedItem(-2, Move(CardCoordinates(Places.block_place(color)), CardCoordinates(Places.block_place(color)))))
         for i in range(len(self.hold)):
             if self.hold[i] is None:
                 continue
             for j in range(len(self.solved)):
                 if self.hold[i].is_solution(self.solved[j]):
-                    moves.put(PrioritizedItem(-5, Move(CardCoordinates(Places.hold_place(i)), CardCoordinates(Places.solved_place(j)))))
+                    moves.put(SinglePrioritizedItem(-5, Move(CardCoordinates(Places.hold_place(i)), CardCoordinates(Places.solved_place(j)))))
                 
         return [x.item for x in moves.queue]
 
@@ -314,20 +320,20 @@ def a_star(P: queue.PriorityQueue, Pset: Set[State], Qset: Set[State], heuristic
             size[0] = P.qsize() + len(Qset)
             if (size[0] - size[1]) > 10000:
                 size[1] = size[0]
-                print(f"Max_size: {size[0]} = {len(Pset)} + {len(Qset)} {time.strftime("%H:%M:%S")} best score: {heuristic(state)}")
+                print(f"{time.strftime("%H:%M:%S")}  max_size: {size[0]} = {len(Pset)} + {len(Qset)} best score: {heuristic(state)}, depth: {state.prev_state[2]}")
                 print(state)
         for move in state.get_valid_moves():
             new_state = state.move(move)
             if new_state.is_solved():
                 return get_moves(new_state)
             if new_state not in Pset and new_state not in Qset:
-                P.put(PrioritizedItem(-heuristic(new_state), new_state))
+                P.put(DualPrioritizedItem(-heuristic(new_state), new_state.prev_state[2], new_state))
                 Pset.add(new_state)
     return []
 
 def solve(init_state: State) -> List[Move]:
     P = queue.PriorityQueue()
-    P.put(PrioritizedItem(-init_state.heuristic(), init_state))
+    P.put(DualPrioritizedItem(0, 0, init_state))
     Pset = set([init_state])
     Qset = set()
     moves = a_star(P, Pset, Qset, lambda x: x.heuristic())
