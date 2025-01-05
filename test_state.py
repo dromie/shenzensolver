@@ -24,6 +24,9 @@ def test_RBLOCK():
 
 def test_solve_trivial():
     init_state = State()
+    init_state.hold = [Card(2,BLOCK_CARD_HOLD), Card(0,BLOCK_CARD_HOLD), Card(1,BLOCK_CARD_HOLD)]
+
+
     init_state.load_table(["r9 r8 r7 r6 r5 r4 r3 r2 r1", "g9 g8 g7 g6 g5 g4 g3 g2 g1", "b9 b8 b7 b6 b5 b4 b3 b2 b1"])
     moves = solve(init_state)
     assert len(moves) == 27
@@ -112,3 +115,34 @@ def test_why():
     assert any([move.from_.place == Places.H2 for move in moves])
 
 
+def test_autosolve_move():
+    state1 = State()
+    state1.hold = []
+    state1.solved = [Card.construct("b3"), Card.construct("g3"), Card.construct("r2")]
+    state1.load_table(["r3", "b4", "g4", "g5", "g6", "", "", ""])
+    assert state1.is_auto_solveable(Card.construct("r3"))
+    moves = state1.get_valid_moves()
+    assert len(moves) == 1
+    assert moves[0].from_.place == Places.T1 and moves[0].to.place == Places.S3 and moves[0].auto_move
+
+def test_autosolve_move2():
+    state1 = State()
+    state1.hold = []
+    state1.solved = [Card.construct("b2"), Card.construct("g3"), Card.construct("r1")]
+    state1.load_table(["b3", "b4", "g4", "g5", "g6", "", "", ""])
+    assert state1.is_auto_solveable(Card.construct("b3"))
+    moves = state1.get_valid_moves()
+    assert len(moves) == 1
+    assert moves[0].from_.place == Places.T1 and moves[0].to.place == Places.S1 and moves[0].auto_move
+
+def test_autosolve_move_no():
+    state1 = State()
+    state1.hold = []
+    state1.solved = [Card.construct("b3"), Card.construct("g3"), Card.construct("r1")]
+    state1.load_table(["b4", "g4", "g5", "g6", "", "", ""])
+    assert not state1.is_auto_solveable(Card.construct("b4"))
+    assert not state1.is_auto_solveable(Card.construct("g4"))
+    assert state1.is_auto_solveable(Card.construct("r2"))
+    moves = state1.get_valid_moves()
+    assert len(moves) != 1
+    assert not any([move.auto_move for move in moves])

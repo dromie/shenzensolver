@@ -69,6 +69,8 @@ def analyze(screen) -> Tuple[State, Tuple[List[int], List[int], int | None]]:
                 elif j in [5,6,7]:
                     state.solved[j-5] = Card.construct(c)
     state.load_table(table_str)
+    if len(columns) == 9:
+        columns = columns[:5] + columns[6:]
     return (state, (rows, columns, holdrows))
 
 

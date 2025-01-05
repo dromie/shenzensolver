@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import pyautogui
 
-from solver import State, solve, Move, Places, CardCoordinates
+from solver import CardCoordinates, State, solve, Move, Places
 from analyze import analyze
 
 # Replace with the title of your window
@@ -51,6 +51,12 @@ def capture_screen() -> Tuple[np.ndarray, int, int]:
         print(f"An error occurred: {e}")
 
 OFFSET=10
+
+def xdotool_click():
+    subprocess.run(["xdotool", "mousedown", "1"])
+    time.sleep(0.1)
+    subprocess.run(["xdotool", "mouseup", "1"])
+
 def make_a_move(move:Move, screengeometry:Tuple[List[int], List[int], int], screenx: int, screeny: int) -> None:
     def calculate_position(place: Places, position: int) -> Tuple[int, int]:
         if place.value >= Places.T1.value and place.value <= Places.T8.value:
@@ -62,14 +68,14 @@ def make_a_move(move:Move, screengeometry:Tuple[List[int], List[int], int], scre
             return x+screenx, y+screeny
         elif place.value >= Places.H1.value and place.value <= Places.H3.value:
             if len(screengeometry[2]) == 0:
-                 y = screengeometry[0][0]-(screengeometry[0][4]-screengeometry[0][0])
+                 y = screengeometry[0][0]-(screengeometry[0][4]-screengeometry[0][0])*2
             else:
                 y = screengeometry[2][-1]
             x = screengeometry[1][place.value - Places.H1.value]
             return x+screenx, y+screeny
         elif place.value >= Places.S1.value and place.value <= Places.S3.value:
             if len(screengeometry[2]) == 0:
-                 y = screengeometry[0][0]-(screengeometry[0][4]-screengeometry[0][0])
+                 y = screengeometry[0][0]-(screengeometry[0][4]-screengeometry[0][0])*2
             else:
                 y = screengeometry[2][-1]
             x = screengeometry[1][place.value - Places.S1.value + 5]
@@ -82,10 +88,8 @@ def make_a_move(move:Move, screengeometry:Tuple[List[int], List[int], int], scre
             y=screeny + 160 + (move.to.place.value - Places.RBLOCK.value) * 80
             pyautogui.moveTo(x, y, duration=0.1, tween=pyautogui.easeInOutQuad)
             time.sleep(0.1)
-            pyautogui.click()
-            pyautogui.doubleClick(x, y, duration=0.2)
+            xdotool_click()
             print(f"Click!")
-            time.sleep(5)
 
     else:
         source = calculate_position(move.from_.place, move.from_.position)
@@ -97,8 +101,17 @@ def make_a_move(move:Move, screengeometry:Tuple[List[int], List[int], int], scre
 
 
 if __name__ == "__main__":
-        filenamebase = f"captured/{datetime.datetime.now():%Y-%m-%d-%H:%M:%S}"
         screen = capture_screen()
+        if len(sys.argv) > 1:
+            pyautogui.click(screen[1]+OFFSET, screen[2]+OFFSET, duration=0.1)
+            x = screen[1]+OFFSET+1450
+            y = screen[2]+OFFSET+920
+            print(f"Clicking at {x}, {y}")
+            pyautogui.moveTo(x, y, duration=0.1, tween=pyautogui.easeInOutQuad)
+            xdotool_click()
+            time.sleep(5)
+        screen = capture_screen()            
+        filenamebase = f"captured/{datetime.datetime.now():%Y-%m-%d-%H:%M:%S}"
         cv2.imwrite(filenamebase + ".png", screen[0])
         # Analyze the screen
         analisis = analyze(screen[0])
@@ -107,11 +120,15 @@ if __name__ == "__main__":
             f.write(str(analisis[0].table))
         pyautogui.click(screen[1]+OFFSET, screen[2]+OFFSET, duration=0.1)
 
-        #make_a_move(Move(CardCoordinates(Places.GBLOCK, 0), CardCoordinates(Places.GBLOCK, 0)), analisis[1], screen[1], screen[2])
+        #make_a_move(Move(CardCoordinates(Places.T1, 0), CardCoordinates(Places.S1, 0)), analisis[1], screen[1], screen[2])
         #sys.exit(0)
         moves = solve(analisis[0])
         for move in moves:
             print(move)
-            make_a_move(move, analisis[1], screen[1], screen[2])
-            time.sleep(1)
+            if move.auto_move:
+                print("Auto move")
+                time.sleep(0.3)
+            else:
+                make_a_move(move, analisis[1], screen[1], screen[2])
+                time.sleep(0.5)
         #print("\n".join(map(str, moves)))

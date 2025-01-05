@@ -8,8 +8,8 @@ from typing import List, Tuple, Set, Any, Callable
 from enum import Enum
 from copy import deepcopy
 
-BLOCK_CARD = -5
-BLOCK_CARD_HOLD = -10
+BLOCK_CARD = 255
+BLOCK_CARD_HOLD = 254
 
 COLORDICT ={
             "r": 0,
@@ -125,14 +125,16 @@ class Move:
     from_: CardCoordinates
     to: CardCoordinates
     depth: int
+    auto_move: bool
 
-    def __init__(self, from_: CardCoordinates, to: CardCoordinates, depth = 0):
+    def __init__(self, from_: CardCoordinates, to: CardCoordinates, depth = 0, auto_move = False):
         self.from_ = from_
         self.to = to
         self.depth = depth
+        self.auto_move = auto_move
 
     def __str__(self):
-        return f"{self.from_}(depth: {self.depth}) -> {self.to}"
+        return f"{self.from_}({self.depth=}, {self.auto_move=}) -> {self.to}"
 
     def __repr__(self):
         return self.__str__()
@@ -176,21 +178,34 @@ class State:
         return f"{hold}\n{solved}\n{table}"
 
     def is_solved(self) -> bool:
-        return all(map(lambda x: x is not None and x.number == 9, self.solved))
+        return all(map(lambda x: x is not None and x.number == 9, self.solved)) and all(map(lambda x: x is not None and x.number == BLOCK_CARD_HOLD, self.hold))
+
 
     def heuristic(self) -> int:
+        weights = [4, 4, 2, 4]
         h = 0
-        h += sum(map(lambda x: 0 if x is None else x.number, self.solved)) * 6 
-        h -= sum(map(lambda x: 0 if x is None else 1, self.hold)) 
-        h += sum(map(lambda x: 1 if len(x) == 0 else 0, self.table)) 
-        h += sum(map(lambda x: 1 if x is not None and x.number == BLOCK_CARD_HOLD else 0, self.hold))
-        h += sum(map(lambda x: 1 if len(x) > 0 and x[0].number == 9 else 0, self.table))
+        for i in range(len(self.table)):
+            column_height = len(self.table[i])
+            for j in range(column_height-1):
+                if self.table[i][j].number < self.table[i][j+1].number:
+                    h -= weights[0]+column_height-j
+        h += weights[1] * sum(map(lambda x: 0 if x is None else x.number, self.solved))
+        h += weights[2] * sum(map(lambda x: 1 if x is not None and x.number == BLOCK_CARD_HOLD else 0, self.hold))
+
         for color in ["r", "g", "b"]:
             b = sum(map(lambda x: 1 if len(x) > 0 and x[-1].number == BLOCK_CARD and x[-1].color==COLORDICT[color] else 0, self.table))
             if b==4:
-                h+=4
+                h+=weights[3]
         return h
 
+    def is_auto_solveable(self, card: Card) -> bool:
+        solved_by_color = {COLORDICT[color]: 0 for color in ["r", "g", "b"]}
+        for s in self.solved:
+            if s is not None:
+                solved_by_color[s.color] = s.number
+        minc = solved_by_color[card.color] + 1
+        mino = min([v for k,v in solved_by_color.items() if k != card.color])
+        return card.number == minc and card.number <= mino + 1
     
     def get_valid_moves(self) -> List[Move]:
         moves = queue.PriorityQueue()
@@ -208,13 +223,14 @@ class State:
             if len(self.table[i]) == 0:
                 continue
             if self.table[i][-1].number == BLOCK_CARD and self.table[i][-1].color == COLORDICT["o"]:
-                moves.put(SinglePrioritizedItem(-9, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.OBLOCK))))
-                continue
+                return [Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.OBLOCK), auto_move=True)]
+           
             for j in range(len(self.solved)):
                     if self.table[i][-1].is_solution(self.solved[j]):
-                        moves.put(SinglePrioritizedItem(-5, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
-                        if self.table[i][-1].number == 1:
-                            break
+                        if self.is_auto_solveable(self.table[i][-1]):
+                            return [Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)), auto_move=True)]
+                        else:
+                            moves.put(SinglePrioritizedItem(-5, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.solved_place(j)))))
             for j in range(len(self.table)):
                 if len(self.table[j])==0 or self.table[i][-1].can_be_put_over(self.table[j][-1]):
                     moves.put(SinglePrioritizedItem(10, Move(CardCoordinates(Places.table_place(i), column_height), CardCoordinates(Places.table_place(j), len(self.table[j])))))
@@ -261,7 +277,7 @@ class State:
                     new_state.hold[i] = None
                     if hold_index is None:
                         hold_index = i
-                if new_state.hold[i] is None:
+                if new_state.hold[i] is None and hold_index is None:
                     hold_index = i
             for i in range(len(new_state.table)):
                 if len(new_state.table[i])>0 and new_state.table[i][-1] == card:
